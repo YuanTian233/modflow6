@@ -14,7 +14,7 @@ After running this, the data will be saved as a csv file.
 '''
 
 #  the hydraulic conductivity data from matlab.
-data=loadmat('C:/Users/tian/Desktop/gwf_flopy_modflow6/input/hk.mat')
+data=loadmat('............/hk.mat')
 k = data['Y_true']
 k11 = np.exp(k)/100.0 * 86400
 hk = k11
@@ -25,7 +25,7 @@ hk = k11
 def rungwfmodle(hk):
     name = "gwf50x50"  # a name you like.
     ws = os.path.join('model',name) # crate a folder name ".../model/gwf50x50"
-    exe_name = 'C:/Users/tian/Desktop/mf6.4.2/mf6.4.2_win64/bin/mf6.exe'  #remamber to change this path.
+    exe_name = '......./mf6.exe'  #remamber to change this path.
 
     length_units = "meters"
     time_units = "days"
@@ -64,7 +64,7 @@ def rungwfmodle(hk):
 
 
     # rech = 10.0 # no recharge in this case
-    # idomain0 = np.loadtxt( 'E:/kurs/masterThesis/code/test/input/idomain.txt', dtype=np.int32)
+    # idomain0 = np.loadtxt( '........./idomain.txt', dtype=np.int32)
     # idomain = nlay * [idomain0]
     idomain = np.ones((nlay, nrow, ncol), dtype=int)
     # idomain[0, 0, :] = -1
@@ -246,7 +246,7 @@ def rungwfmodle(hk):
 
     # Instantiating MODFLOW 6 obsevation package for flow model
     obsdict = {}
-    #loc = np.loadtxt('E:/kurs/masterThesis/code/test/input/point_loc.txt',dtype=int)
+    #loc = np.loadtxt('............../point_loc.txt',dtype=int)
     obslist = [
         #[  name of the obspoint    head(if want to observe water head)    (layer, row, column)
         ["loc_1", "head", (0, 25, 25)],
