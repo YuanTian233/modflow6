@@ -1,103 +1,119 @@
 import os
-import sys
 import matplotlib.pyplot as plt
 import flopy
 import numpy as np
+import scipy.stats as stats
+from copy import deepcopy
 
-from scipy.io import loadmat
+# from scipy.io import loadmat
 
 '''
 Modflow6 is used in this model. 
         https://water.usgs.gov/water-resources/software/MODFLOW-6/
+More example questions please check this website:
+        https://modflow6-examples.readthedocs.io/en/latest/notebook_examples.html
 Modflow6 gwf(Ground water Flow) and gwt(Ground water Transport) are used in this case.
-After running this, the data will be saved as a csv file.
+After running this, the observation (10 locations in layer 0[(25, 25),
+                                                            (26, 31),
+                                                            (5, 18),
+                                                            (22, 7),
+                                                            (18, 27),
+                                                            (42, 36),
+                                                            (43, 10),
+                                                            (32, 20),
+                                                            (22, 32),
+                                                            (11, 41)]) 
+data will be saved as a csv file. 
+And those observation need to be manuly change in (obsevation package for flow model (line 256)),
+                                                  (obsevation package for transport (line 412)) and
+                                                  (plot part (line 460))
 '''
+name = "gwf50x50"  # a name you like.
+ws = os.path.join('model',name) # crate a folder name ".../model/gwf50x50" the data will be save under this folder!!
+exe_name = 'C:/Users/tian/Desktop/mf6.4.2/bin/mf6.exe'  #remamber to change this path.
+gwfname = "gwf_" + name # a name you can change for groundwater flow model
+gwtname = "gwt_" + name # a name you can change for groundwater transport model
 
-#  the hydraulic conductivity data from matlab.
-data=loadmat('............/hk.mat')
-k = data['Y_true']
-k11 = np.exp(k)/100.0 * 86400
-hk = k11
+#With this Basic Package, we can now create the static flopy objects: 
+sim = flopy.mf6.MFSimulation(
+    sim_name=name,
+    sim_ws=ws,
+    exe_name=exe_name
+    )
+
+"""
+Here is the basic setting.
+This case is 1 layer 50 by 50 grids. Every grid is 1 by 1 meter.
+Water head on left is 1.0 m. right side is 0.0m
+The contamination is on the left boundary with c1 = 1.0 mg/l.
+"""
+
+length_units = "meters"
+time_units = "days"
+Lx = 50 # x derection length ($m$)
+Ly = 50 # y derection length ($m$)
+top = 0  # Top of the model ($m$)
+botm= -1 # bottom of the model ($m$)
+nlay = 1  # Number of layers
+nrow = 50  # Number of rows
+ncol = 50  # Number of columns
+delr = Lx/ncol  # Column width ($m$)
+delc = Ly/nrow  # Row width ($m$)
+delz = top-botm  # Layer thickness ($m$)
+
+# Transport parameters
+prsity = 0.35  # Porosity
+alpha_l = 2.5  # Longitudinal dispersivity ($m$)
+alpha_th = 0.25  # Transverse horizontal dispersivity ($m$)
+dmcoef = 1.10e-9 / 100 / 100 * 86400  # cm^2/s -> m^2/d
+
+
+"""
+Here is the Flow boundary condition.
+
+"""
+
+
+# This is the Flow boundary condition. 
+idomain = np.ones((nlay, nrow, ncol), dtype=int) # 1 means a activate cell
 
 
 
+# This is the water head and concentration boundary condition.
+chdspd = []
+H1 = 1.0  #left water head
+H2 = 0.0  #right water head
+#     [(layer,row, column), head, concentration]
+chdspd += [[0, i, 0, H1, 0.0] for i in range(nrow)]
+for j in np.arange(nrow):
+    chdspd.append([0, j, ncol-1, H2, 0.0])
+chdspd = {0: chdspd}
 
-def rungwfmodle(hk):
-    name = "gwf50x50"  # a name you like.
-    ws = os.path.join('model',name) # crate a folder name ".../model/gwf50x50"
-    exe_name = '......./mf6.exe'  #remamber to change this path.
 
-    length_units = "meters"
-    time_units = "days"
+# Setup constant concentration information
+sconc = 0.0 # this is the satrting Concentration or background Concentration normaly is 0
+cncspd = []
+cnc = 1.0
+for row in np.arange(20, 31):  # this is the concentration on left side (for 10 meters)
+    cncspd.append([(0, row, 0), cnc])
+cncspd = {0: cncspd}
 
+#Solver settings
+nper = 1  # Number of periods
+nstp = 50  # Number of time steps
+perlen = 100000  # Simulation time length ($d$)
+icelltype = 0
+mixelm = 0
+
+def rungwfmodle(hk): 
     """
-    Here is the basic setting.
-    This case is 1 layer 50 by 50 grids. Every grid is 1 by 1 meter.
-    Water head on left is 1.0 m. right side is 0.0m
-    The contamination is on the left boundary with c1 = 1.0 mg/l.
-    """
-
-    Lx = 50
-    Ly = 50
-    top = 0  # Top of the model ($m$)
-    botm= -1 # bottom of the model ($m$)
-    nlay = 1  # Number of layers
-    nrow = 50  # Number of rows
-    ncol = 50  # Number of columns
-    delr = Lx/ncol  # Column width ($m$)
-    delc = Ly/nrow  # Row width ($m$)
-    delz = top-botm  # Layer thickness ($m$)
-
-    # Transport parameters
-    prsity = 0.35  # Porosity
-    alpha_l = 2.5  # Longitudinal dispersivity ($m$)
-    alpha_th = 0.25  # Transverse horizontal dispersivity ($m$)
-    dmcoef = 1.10e-9 / 100 / 100 * 86400  # cm^2/s -> m^2/d
-
-
-
-
-    """
-    Here is the Flow boundary condition.
+    This function is the main body of modflow6.
     
+    :param hydraulic conductivity: array [n_zones]
+        based on the zone distrubution.
+
     """
-
-
-    # rech = 10.0 # no recharge in this case
-    # idomain0 = np.loadtxt( '........./idomain.txt', dtype=np.int32)
-    # idomain = nlay * [idomain0]
-    idomain = np.ones((nlay, nrow, ncol), dtype=int)
-    # idomain[0, 0, :] = -1
-    # idomain[0, 49, :] = -1
-
-
-    # This is the water head
-    chdspd = []
-    H1 = 1.0  #left water head
-    H2 = 0.0  #right water head
-    #     [(layer,row, column), head, conc]
-    chdspd += [[0, i, 0, H1, 0.0] for i in range(nrow)]
-    for j in np.arange(nrow):
-        chdspd.append([0, j, 49, H2, 0.0])
-    chdspd = {0: chdspd}
-
-
-    # Setup constant concentration information
-    sconc = 0.0 # this is the satrting Concentration or background Concentration normaly is 0
-    cncspd = []
-    cnc = 1.0
-    for row in np.arange(20, 31):  # this is the concentration on left side (for 10 meters)
-        cncspd.append([(0, row, 0), cnc])
-    cncspd = {0: cncspd}
-
-    #Solver settings
-    nper = 1  # Number of periods
-    nstp = 50  # Number of time steps
-    perlen = 100000  # Simulation time length ($d$)
-    icelltype = 0
-    mixelm = 0
-
-    #solving setting. I still don't understand, so I keep every one.
+    #solving setting. I still don't understand, so I keep them as same.
     nouter, ninner = 100, 300
     hclose, rclose, relax = 1e-6, 1e-6, 1.0
     percel = 1.0  # HMOC parameters
@@ -118,15 +134,6 @@ def rungwfmodle(hk):
     """"
     # MODFLOW 6 gwf pakage for  simulation waterhead, hydraulic conductivity, wells and etc..
     """
-
-    gwfname = "gwf-" + name
-
-    sim = flopy.mf6.MFSimulation(
-        sim_name=name,
-        sim_ws=ws,
-        exe_name=exe_name
-    )
-
     # Instantiating MODFLOW 6 time discretization
     tdis_rc = []
     tdis_rc.append((perlen, nstp, 1.0))
@@ -143,7 +150,7 @@ def rungwfmodle(hk):
         modelname=gwfname,
         save_flows=True,
         model_nam_file="{}.nam".format(gwfname),
-            )
+    )
 
     # Instantiating MODFLOW 6 solver for flow model
     imsgwf = flopy.mf6.ModflowIms(
@@ -246,7 +253,6 @@ def rungwfmodle(hk):
 
     # Instantiating MODFLOW 6 obsevation package for flow model
     obsdict = {}
-    #loc = np.loadtxt('............../point_loc.txt',dtype=int)
     obslist = [
         #[  name of the obspoint    head(if want to observe water head)    (layer, row, column)
         ["loc_1", "head", (0, 25, 25)],
@@ -260,6 +266,9 @@ def rungwfmodle(hk):
         ["loc_9", "head", (0, 22, 32)],
         ["loc_10", "head", (0, 11, 41)],
     ]
+    
+    # obslist = pd.read_csv('C:/Users/tian/Desktop/test/obslist.csv').values.tolist()
+    
     obsdict["{}.obs.head.csv".format(gwfname)] = obslist
 
     obs = flopy.mf6.ModflowUtlobs(
@@ -273,7 +282,8 @@ def rungwfmodle(hk):
     Instantiating MODFLOW 6 groundwater transport package for transport problem.
     """
     #
-    gwtname = "gwt_" + name
+    
+    
     gwt = flopy.mf6.MFModel(
         sim,
         model_type="gwt6",
@@ -431,20 +441,38 @@ def rungwfmodle(hk):
 
     sim.write_simulation(silent=True)
     success, buff = sim.run_simulation()
+  
 
 
 
+    
+    return
 
-    """
-    Ploting part for water head, concentration and hk.
-    """
+
+"""
+Ploting part for water head, concentration and hk.
+"""
+def plotgwm(hk): 
+      
     gwf = sim.get_model(gwfname)
     H = gwf.output.head().get_data()
     fig = plt.figure(figsize=(6, 6))
+    point_loc = np.array(
+        [(25, 25),
+        (26, 31),
+        (5, 18),
+        (22, 7),
+        (18, 27),
+        (42, 36),
+        (43, 10),
+        (32, 20),
+        (22, 32),
+        (11, 41)]
+        ) # this mark the location of obs points on plot
     ax = fig.add_subplot(1, 1, 1, aspect="equal")
     mm = flopy.plot.PlotMapView(model=gwf)
     plt.rcParams["lines.dashed_pattern"] = [5.0, 5.0]
-    pa = mm.plot_array(H,
+    im1 = mm.plot_array(H,
                        # vmin=0,
                        # vmax=1.1
                        )
@@ -454,66 +482,113 @@ def rungwfmodle(hk):
                        colors="black",
                        linestyles="--"
                        )
-    cbar = plt.colorbar(pa, shrink=0.25)
+    ax.scatter(point_loc[:, 1], point_loc[:, 0], marker='o',edgecolors='w')
+    cbar = plt.colorbar(im1,shrink=0.8)
     plt.title("Simulated Hydraulic Heads")
     # letter = chr(ord("@"))
     # fs.heading(letter=letter, heading=title)
     plt.clabel(h, fmt="%2.1f")
-
-
-
+    
+    
+    
     gwt = sim.get_model(gwtname)
     conct = gwt.output.concentration()
     times = conct.get_times() # simulation time
-    times1 = times[round(len(times)/4.)] # 1/4 simulation time
-    times2 = times[round(len(times)/2.)] # 1/2 simulation time
+    # times1 = times[round(len(times)/4.)] # 1/4 simulation time
+    # times2 = times[round(len(times)/2.)] # 1/2 simulation time
     times3 = times[-1] # the last simulation time
-    conc1 =conct.get_data(totim=times1)
-    conc2 =conct.get_data(totim=times2)
+    # conc1 =conct.get_data(totim=times1)
+    # conc2 =conct.get_data(totim=times2)
     conc3 =conct.get_data(totim=times3)
     fig = plt.figure(figsize=(6, 6))
-    x = 1000
-    y = 1000
     plt.rcParams["lines.dashed_pattern"] = [5.0, 5.0]
     mm = flopy.plot.PlotMapView(model=gwt)
     pa = mm.plot_array(conc3,
                        vmin=0,
                        vmax=1.1)
     # lc = mm.plot_grid() # grid
-
+    
     cs = mm.contour_array(conc3,
                           levels=np.linspace(0, 1.1, 5),
                           colors="black",
                           linestyles="--")
-    cbar = plt.colorbar(pa, shrink=0.25)
+    plt.colorbar(pa,shrink=0.8)
+    plt.scatter(point_loc[:, 1], point_loc[:, 0], marker='o',edgecolors='w')
     plt.title("Simulated Concentration")
     plt.clabel(cs, fontsize=20, fmt='%1.1f', zorder=1)
-
-
-
-
+    
+    
+    
+    
+      
+    c  =  hk
     fig = plt.figure(figsize=(6, 6))
-    Hk = np.log(gwf.npf.k.array)
-    mm = flopy.plot.PlotMapView(model=gwf)
-    pa = mm.plot_array(Hk)
-    cs = mm.contour_array(Hk)
-    # plt.clabel(cs, fontsize=20, fmt='%1.1f', zorder=1)
-    cbar = plt.colorbar(pa, shrink=0.25)
-    plt.title("Random log(K) Field")
-
-
-
-
-
-    #head = np.loadtxt('E:/kurs/masterThesis/code/test/model/', skiprows=1)[-1, 1:]
-    #concentration = np.loadtxt('E:/kurs/masterThesis/code/test/model/model.gwt.obs.csv', delimiter=',', skiprows=1)[-1, 1:]
-
-
-
-
-
-
+    mod_zones01 = c#[0 : nrow, 0 : ncol]
+    im3 = plt.imshow(mod_zones01)
+    plt.title("Log(K) Field")
+    plt.colorbar(im3, shrink=0.8)
+    plt.scatter(point_loc[:, 1], point_loc[:, 0], marker='o',edgecolors='w')
+    
+    
     plt.show()
     return
 
-rungwfmodle(hk)
+
+def smooth(zones_vec):
+    
+    """
+    This function can smooth the zones.
+    
+    :param zones_vec: array [n_cells, n_cells]  
+    
+    :return: smoothened mod_zones fields<np.array[n_cells_x, n_cells_y]>
+        with zone distribution (ints from 1 to n_zones)
+    """
+    mod_zones = deepcopy(zones_vec)
+
+    for i in range(0, zones_vec.shape[0]):
+        for j in range(0, zones_vec.shape[1]):
+            # Get adjacent indexes
+            n = len(mod_zones)-1
+            m = len(mod_zones[0])-1
+
+            # Initialising a vector array where adjacent elements will be stored
+            v = []
+
+            # Checking for adjacent elements and adding them to array
+            # Deviation of row that gets adjusted according to the provided position
+
+            #
+            for dx in range(-1 if (i > 0) else 0, 2 if (i < n) else 1):
+                # Deviation of the column that gets adjusted according to the provided position
+                for dy in range(-1 if (j > 0) else 0, 2 if (j < m) else 1):
+                    if dx != 0 or dy != 0:
+                        v.append(mod_zones[i + dx][j + dy])
+            #
+            if np.count_nonzero(v == mod_zones[i, j]) < np.count_nonzero(v != mod_zones[i, j]):
+                mod_zones[i, j] = stats.mode(v)[0]
+
+    return mod_zones 
+
+
+def hkfields(zones_vec, parameter_sets, n_zones):
+    """
+    Function assigns corresponding log(K) to each cells.
+
+    :param zones_vec: array [n_cells, n_cells]
+    
+    :param parameter_values: array [n_mc, n_parameters]
+        with parameter sets that need to be transformed into log(K) fields
+    :param n_zones: <int>
+        number of zones       
+    :return: log(K) fields<np.array[n_cells_x, n_cells_y]>
+        with zone distribution (ints from 1 to n_zones)
+    
+    """
+    zones_vec = np.array(zones_vec, dtype=float)
+    log_k_fields = zones_vec
+    for i in range(n_zones):
+        log_k_fields[np.where(log_k_fields == i+1)] = parameter_sets[0, i]
+
+    return log_k_fields
+
