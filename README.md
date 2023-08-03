@@ -8,3 +8,8 @@ Modflow6 is used in this model.
         
 More example questions please check this website:
         https://modflow6-examples.readthedocs.io/en/latest/notebook_examples.html
+
+
+ver1.0: simple working code
+ver1.1: more read-able
+ver2.0: can be runing for multi_times
