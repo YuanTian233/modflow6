@@ -138,7 +138,7 @@ def compute_bme(model_predictions, observations, var, prior_pdf=None, prior_samp
         return BME, RE, IE
 
 
-def bal_selection_criteria(al_strategy, al_BME, al_RE):
+def bal_selection_criteria(al_strategy, al_BME, al_RE, al_IE):
     """
     Gives the best value of the selected bayesian score and index of the associated parameter combination
     ----------
@@ -147,7 +147,7 @@ def bal_selection_criteria(al_strategy, al_BME, al_RE):
     al_BME : array [d_size_AL,1]
         bayesian model evidence of active learning sets
     al_RE: array [d_size_AL,1]
-        relative entropy of active learning sets
+        relative entropy of active learning setsc 
 
     Returns
     -------
@@ -185,5 +185,10 @@ def bal_selection_criteria(al_strategy, al_BME, al_RE):
             print("Warning Active Learning: all values of Relative entropies equal to 0")
             print("Warning Active Learning: all values of Bayesian model evidences are also equal to 0")
             print("Active Learning Action: training point have been selected randomly")
-
+        
+    if al_strategy == 'IE':
+        al_value = np.min(al_IE)
+        al_value_index = np.argmin(al_IE)
+       
+    
     return al_value, al_value_index
