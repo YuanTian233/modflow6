@@ -17,4 +17,4 @@ ver2.0: can be running for multi-times.
         ver2.5: fix something.
         
 
-v3.0: have post and prior sampling and some bug fixing
+ver3.0: have post and prior sampling and some bug fixing
