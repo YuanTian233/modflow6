@@ -50,7 +50,7 @@ gwtname = "t" + sim_name # a name you can change for groundwater transport model
 
 # Bayesian inference data:
 mc_size = 10_000    # number of samples to get from the prior distribution
-
+stop= stop
 # Bayesian Active Learning data:
 tp_i = 30 # number of initial collocation points
 
