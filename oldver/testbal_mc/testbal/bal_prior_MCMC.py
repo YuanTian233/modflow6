@@ -2,6 +2,8 @@
 """
 Created on Fri Aug  4 14:49:18 2023
 
+prior-based MCMC BAL
+
 @author: tian
 """
 import numpy as np
@@ -28,8 +30,8 @@ import time as time
 # --------------------------------------- USER INPUT --------------------------------------------------------------- #
 # ------------------------------------------------------------------------------------------------------------------ #
 T = time.time()
-# model_output_path = 'C:/Users/tian/Desktop/gp/testbal_mc'
-outputfolder = 'output3'
+
+outputfolder = 'output1' # where i save the data, a name you like
 model_output_path = os.getcwd()
 if os.path.exists(os.path.join(model_output_path, outputfolder)):
     print('Path exists')
@@ -37,28 +39,31 @@ else:
     os.mkdir(os.path.join(model_output_path, outputfolder))
 
 
+
+
+
+
+
+# MODFLOW 6 data:
+n_zones = 6 # based on my zoned model it has 6 zones
+model_name = "01" # a name you like.  not too long!
+sim_name = f'{model_name}'
+exe_name = 'C:/Users/tian/Desktop/mf6.4.2/bin/mf6.exe'  #remamber to change this path. Where you MODFLOW 6 is
 np.random.seed(0)
-
-
-model_name = "03"
-
-n_zones = 6 
+ws = os.path.join('model',sim_name) #worksapce for each model
+gwfname = "f" + sim_name # a name you can change for groundwater flow model. Name maximum length of 16
+gwtname = "t" + sim_name # a name you can change for groundwater transport model. Name maximum length of 16 
 
 # Bayesian inference data:
 mc_size = 10_000    # number of samples to get from the prior distribution
-
+MCMC = 1000 # number of MC samples
 # Bayesian Active Learning data:
-tp_i = 30
-                # number of initial collocation points
-MCMC = 1000
-iteration_limit = 270 # number of BAL iterations
+tp_i = 30  # number of initial collocation points
+iteration_limit = 1 # number of BAL iterations
 d_size_AL = 1_000        # number of active learning sets (sets I take from the prior to do the active learning).
 mc_size_AL = 10_000      # sample size for output space
 # Note: d_size_AL+ iteration_limit < mc_size
-al_strategy = "BME"   # BAL criteria (Here we want to test different methods)
-# BME 6.6676338954766585 h
-# RE  6.747033240397771 h
-# IE  6.884736772245831 h
+al_strategy = "IE"   # BAL criteria (Here we want to test different methods)
 
 # Gaussian Process data:
 alpha = 0.0002                # Noise added to diagonal in GPE training
@@ -122,14 +127,10 @@ n_obs= obs.shape[1]
 
 from gwm import hkfields
 from gwm import runmodelflow
-exe_name = 'C:/Users/tian/Desktop/mf6.4.2/bin/mf6.exe'  #remamber to change this path.
+
 zones_vec50x50 = pd.read_csv((model_output_path + '/input/zone_distribution.csv'), dtype=np.float64)
 zones_vec = np.array(zones_vec50x50, dtype = float)
 # # Get collocation points:
-# collocation_points = stats.norm.rvs(loc = gm_mean, 
-#                                         scale = gm_var,
-#                                         size = (tp_i, n_zones)
-#                                         )
 collocation_points = pd.read_csv((os.getcwd() + r'/ref_data/parameter_sets.csv'), header = 0, index_col = 0)
 collocation_points = np.array(collocation_points)
 collocation_points = collocation_points[0:tp_i,]
@@ -202,8 +203,7 @@ val_s_pre = np.zeros((n_obs,iteration_limit+1))
 
 # # Loop for Bayesian update
 for Ntp in range(0, iteration_limit+1):
-    # surrogate_prediction = np.zeros((n_obs,MCMC))
-    # surrogate_std = np.zeros((n_obs,MCMC))
+
     surrogate_prediction = np.zeros((n_obs,mc_size))
     surrogate_std = np.zeros((n_obs,mc_size))
     
@@ -212,11 +212,6 @@ for Ntp in range(0, iteration_limit+1):
     surrogate_prediction_MC_new = np.zeros((n_obs,1)) 
     surrogate_std_MC_old = np.zeros((n_obs,1))
     surrogate_std_MC_new = np.zeros((n_obs,1))
-    
-
-    
-    # surrogate_prediction_MC_old = np.zeros((n_obs,1))
-    # surrogate_prediction_MC_new = np.zeros((n_obs,1))
 
     surrogate_prediction_MC = np.zeros((n_obs,MCMC))
     surrogate_std_MC = np.zeros((n_obs,MCMC))
@@ -256,16 +251,12 @@ for Ntp in range(0, iteration_limit+1):
         #         print(f"    Looping through loc {i}/{n_obs} --> hp: {gp.kernel_.theta}")
         # Evaluate all prior parameter sets in GP
 
-        
-
-        # with open((model_output_path+ '/output/gp.txt' ), "wb") as file:
-        #     pickle.dump(gp_list, file)
 
 
         surrogate_prediction_h = np.array(surrogate_prediction.T)[0:mc_size,0:10]
         surrogate_prediction_c = np.array(surrogate_prediction.T)[0:mc_size,10:20]
 
-        # hk_old = stats.multivariate_normal(mean = math.log(1e-5),cov=1).rvs(6)
+        
        
 
         
@@ -290,26 +281,16 @@ for Ntp in range(0, iteration_limit+1):
                                                   prior_pdf=prior_pdf_set_ref, 
                                                   prior_samples=prior_pdf_set_ref)
         
-        # hk_old = obs_hk[-1].reshape(1, 6)[0]
-        
-        # old_pdf_ind = stats.norm.pdf(hk_old, loc = math.log(1e-5), scale = 1)
-        # old_pdf_set = np.sum(np.prod(old_pdf_ind))                                   
-            
-        # surrogate_prediction_MC_old= gp.predict(hk_old.reshape(1, -1))           
+                   
     
     val_s_std[:,Ntp] = surrogate_std[:,0]
     val_s_pre[:,Ntp] = surrogate_prediction[:,0]
     # hk_old = collocation_points[-1].reshape(1, 6)[0]
     
-    hk_old = prior_ref[tp_i+Ntp] 
-    # # surrogate_prediction_MC_old= gp.predict(hk_old)
-    # surrogate_prediction_MC_old = [gp.predict(hk_old) for _ in range(20)]
+    hk_old = prior_ref[tp_i+Ntp]  # hk_old is starting point here
+
     samples = np.zeros((MCMC,6))
     for MC in range(MCMC):
-
-        
-
-        adj_size = (MC+1) / 1000
 
         hk_new = stats.multivariate_normal(mean = hk_old.reshape(1, 6)[0], 
                                              cov=0.00009).rvs(1) 
@@ -340,10 +321,7 @@ for Ntp in range(0, iteration_limit+1):
         
         
         
-        # prop_ratio = np.log(stats.multivariate_normal.pdf(hk_old, mean=np.mean(hk_new), cov=10)) - \
-        #                 np.log(stats.multivariate_normal.pdf(hk_new,mean=np.mean(hk_old), cov=10))  
-        # ll_diff = np.log(llk_new) - np.log(llk_old)
-        # prior_diff = np.log(new_pdf_set) - np.log(old_pdf_set)
+        
         α = np.exp(
             np.log(llk_new) + new_pdf_set - np.log(llk_old) - old_pdf_set
             ) #+ prop_ratio)
@@ -363,23 +341,8 @@ for Ntp in range(0, iteration_limit+1):
 
  
 
-    prior = samples
+    prior = samples #new prior for GPEs
     prior = np.array(prior)
-    
-    
-    
-    # # Get prior probability for each independent parameter value in each set
-    # prior_pdf_ind = stats.norm.pdf(prior, loc = np.mean(prior), scale =np.std(prior))
-    # # Get prior probability for each set
-    # prior_pdf_set = np.prod(prior_pdf_ind, axis=1)
-    # surrogate_prediction_MC, surrogate_std_MC = zip(*[gp.predict(prior, return_std=True) for _ in range(20)])
-    # surrogate_prediction_MC = np.array(surrogate_prediction_MC)
-    # surrogate_std_MC = np.array(surrogate_std_MC)
-    
-    # with open((model_output_path+ '/output/gp_list.pkl' ), 'rb') as file:
-    #     loaded_gp_list = pickle.load(file)
-    # for i, gp_model in enumerate(gp_list):
-    #     surrogate_prediction_MC[i,:], surrogate_std_MC[i,:] = gp_model.predict(prior, return_std=True)
 
         
     
@@ -393,7 +356,6 @@ for Ntp in range(0, iteration_limit+1):
         aux1 = np.where((prior[:d_size_AL + Ntp, :] == collocation_points[:, None]).all(-1))[1]
         aux2 = np.invert(np.in1d(np.arange(prior[:d_size_AL + Ntp, :].shape[0]), aux1))
         al_unique_index = np.arange(prior[:d_size_AL + Ntp, :].shape[0])[aux2]
-        # al_unique_index = 1000
 
         
         
@@ -401,9 +363,6 @@ for Ntp in range(0, iteration_limit+1):
         al_RE = np.zeros((len(al_unique_index), 1))
         al_IE = np.zeros((len(al_unique_index), 1))
         
-        # al_BME = np.zeros((1000, 1))
-        # al_RE = np.zeros((1000, 1))
-        # al_IE = np.zeros((1000, 1))
         
         # Index of the elements of the prior distribution that have not been used as collocation points
 
@@ -412,7 +371,6 @@ for Ntp in range(0, iteration_limit+1):
         
         for iAL in range(0, len(al_unique_index)):
             
-        # for iAL in range(0, 1000):
 
             
             # Exploration of output subspace associated with a defined prior combination.
@@ -460,16 +418,15 @@ for Ntp in range(0, iteration_limit+1):
         
         
 
-        # Part 9. Computation of the numerical model in the newly defined collocation point --------------------------
+        # Part 9. Computation of the modflow 6 model in the newly defined collocation point --------------------------
+        # get the secleted point by BAL
         parameter_sets = collocation_points[-1, :]
+        # put the parameter_sets into zone
         parameter_sets = np.reshape(parameter_sets, (1, n_zones))
         k = hkfields(zones_vec = zones_vec, parameter_sets = parameter_sets, n_zones = n_zones)        
         k11 = np.exp(k)/100.0 * 86400  # cm^2/s -> m^2/d
         hk = k11
-        sim_name = f'{model_name}'
-        ws = os.path.join('model',sim_name) #worksapce for each model
-        gwfname = "f" + sim_name # a name you can change for groundwater flow model. Name maximum length of 16
-        gwtname = "t" + sim_name # a name you can change for groundwater transport model. Name maximum length of 16 
+    
         runmodelflow(sim_name = sim_name, 
                       sim_ws = ws,
                       exe_name = exe_name,
@@ -477,21 +434,14 @@ for Ntp in range(0, iteration_limit+1):
                       gwtname = gwtname,
                       hk = hk,
                       plot = False) 
+         #saving       
         h_eva1 = pd.read_csv((os.getcwd() + f'/model/{sim_name}/{gwfname}.obs.head.csv'), dtype=np.float64, header=0, usecols=range(1, 11), skiprows=1).iloc[-1:]
         h_eva1 = np.array(h_eva1).reshape(1,10)
-        # h_eva1  = np.array(h_eva1)[:,0:6]
         h_eva1 = add_noise(h_eva1, h_error,n_sizes = 10, seed=0, ret_error=True)[0]
-
-
-        
         h_eva = np.vstack((h_eva,h_eva1))
-        
         conc_eva1 = pd.read_csv((os.getcwd() + f'/model/{sim_name}/{gwtname}.obs.conc.csv'),  dtype=np.float64, header=0, usecols=range(1, 11), skiprows=1).iloc[-1:]
         conc_eva1 = np.array(conc_eva1).reshape(1,10)
-        # h_eva1  = np.array(h_eva1)[:,0:6]
         conc_eva1 = add_noise(conc_eva1, c_error,n_sizes = 10, seed=0, ret_error=True)[0]
-
-        
         conc_eva = np.vstack((conc_eva,conc_eva1))
         eva = np.hstack((h_eva, conc_eva))
         
@@ -499,7 +449,7 @@ for Ntp in range(0, iteration_limit+1):
         
     # Progress report
     print("Bayesian iteration: " + str(Ntp + 1) + "/" + str(iteration_limit))
-
+#saving
 data_to_save = [
     (pd.DataFrame(collocation_points), 'collocation_points.csv'),
     (pd.DataFrame(eva), 'comb_TP.csv'),
