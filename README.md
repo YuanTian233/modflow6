@@ -3,7 +3,7 @@ for ground water flow and transport model
 
 need flopy and modflow6
 
-Modflow6 is used in this model. 
+MODFLOW 6 is used in this model. 
         
 MODFLOW 6:
         https://water.usgs.gov/water-resources/software/MODFLOW-6/
