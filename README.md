@@ -1,5 +1,9 @@
 
-for ground water flow and transport model
+for groundwater flow and transport model
+
+Markov Chain Monte Carlo (MCMC)
+
+Monte Carlo (MC)
 
 need flopy and modflow6
 
