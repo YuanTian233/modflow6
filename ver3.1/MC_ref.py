@@ -34,7 +34,7 @@ exe_name = 'C:/Users/tian/Desktop/mf6.4.2/bin/mf6.exe'  #remamber to change this
 model_name = "50"  #a name you like, not too long.
     
  
-n_reali =  1 #this is the MC size
+n_reali =  2 #this is the MC size
 
 
 n_zones = 6 # i got a zoned model, so i have 6 parameter
@@ -67,6 +67,7 @@ count = 0
 waterhead = []
 concentration  = []
 
+
 for count in range(n_reali):
     # tmpdir = tempfile.mkdtemp()
     sim_name = f'{model_name}_{count}' #simulation name of each model
@@ -75,7 +76,7 @@ for count in range(n_reali):
     gwtname = "t" + sim_name # a name you can change for groundwater transport model. Name maximum length of 16 
     
             
-    k = hkfields(zones_vec = zones_vec,parameter_sets = obs,n_zones = n_zones)
+    k = hkfields(zones_vec = zones_vec, parameter_sets = parameter_sets[count:,] ,n_zones = n_zones)
         
     k11 = np.exp(k)/100.0 * 86400  # cm^2/s -> m^2/d
     # k11 = np.exp(y_true)/100.0 * 86400  # cm^2/s -> m^2/d
