@@ -76,7 +76,10 @@ for count in range(n_reali):
     gwtname = "t" + sim_name # a name you can change for groundwater transport model. Name maximum length of 16 
     
             
-    k = hkfields(zones_vec = zones_vec, parameter_sets = parameter_sets[count:,] ,n_zones = n_zones)
+    k = hkfields(zones_vec = zones_vec, 
+                 parameter_sets = parameter_sets[count:,],
+                 #parameter_sets = obs, #this is use to run the obs
+                 n_zones = n_zones)
         
     k11 = np.exp(k)/100.0 * 86400  # cm^2/s -> m^2/d
     # k11 = np.exp(y_true)/100.0 * 86400  # cm^2/s -> m^2/d
