@@ -46,7 +46,7 @@ BAL and GPEs:
                 
                 bal_prior_mc.py: random sampling
                 
-        ###############
+        ##
         
         expolartion sets sampling:
         
