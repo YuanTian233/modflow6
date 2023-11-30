@@ -16,7 +16,7 @@ More example questions please check this website:
         https://modflow6-examples.readthedocs.io/en/latest/notebook_examples.html
 
 
-##############################
+############################################################
 
 floder:
 
@@ -25,6 +25,8 @@ floder:
 input: obs data and zone distubution 
 
 ref_data: 10,000 MODFLOW 6 runs and ture HK genareted by MATLAB
+
+##############################
 
 py file:
 
@@ -67,7 +69,7 @@ plots.py
 vs.py
 
 
-##############################
+############################################################
 
 
 
