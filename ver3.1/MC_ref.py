@@ -30,9 +30,11 @@ from gwm import hkfields
 from gwm import runmodelflow
 
 
-n_zones = 6 
-n_reali =  1
+ 
+n_reali =  1 #this is the MC size
 
+
+n_zones = 6 # i got a zoned model, so i have 6 parameter
 
 gm_mean = math.log(1e-5)  # ln(K) average --> constant
 gm_var = 1.0  # ln(K) variance --> constant
@@ -46,24 +48,24 @@ obs= np.array(obs)
 zones_vec50x50 = pd.read_csv((model_output_path + '/input/zone_distribution.csv'), dtype=np.float64)
 zones_vec = np.array(zones_vec50x50, dtype = float)
 
-
+# save the parameter sets
 df = pd.DataFrame(parameter_sets)        
 df.to_csv(os.path.join(model_output_path+ r'/output','parameter_sets.csv'))
 
+####if you want the ture results you can use this data as the input in line 77
 mat_file_path = (model_output_path + '/ref_data/Y_true.mat')
-
 # Load the .mat file
 mat_contents = scipy.io.loadmat(mat_file_path)
 y_true = mat_contents['Y_true']
 
 count = 0
-model_name = "50"  
-exe_name = 'C:/Users/tian/Desktop/mf6.4.2/bin/mf6.exe'  #remamber to change this path.
 waterhead = []
 concentration  = []
+
 for count in range(n_reali):
     # tmpdir = tempfile.mkdtemp()
-    
+    model_name = "50"  
+    exe_name = 'C:/Users/tian/Desktop/mf6.4.2/bin/mf6.exe'  #remamber to change this path.
     sim_name = f'{model_name}_{count}' #simulation name of each model
     ws = os.path.join('model',sim_name) #worksapce for each model
     gwfname = "f" + sim_name # a name you can change for groundwater flow model. Name maximum length of 16
